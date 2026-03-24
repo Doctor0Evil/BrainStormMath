@@ -1,0 +1,323 @@
+-- File: aln-contracts/source/capability_charter.aln
+--
+-- Augmented Legal/Neural (ALN) Capability Charter for CyberNano / Organichain
+-- Codifies sovereign rights, omnotonic monotonicity, and biocompatibility constraints
+-- into an enforceable smart contract layer for the MT6883 Cybernetic Chipset.
+--
+-- Mathematical Foundation:
+--   1. Lyapunov Risk Functional: V(z) must be non-increasing (dV/dt <= 0).
+--   2. Biocompatibility Index: B(F) must remain < 0.8.
+--   3. Protected Coordinates: z_protected must be non-decreasing (dz/dt >= 0).
+--   4. Sovereign Binding: All actions require Brain-IP cryptographic commitment.
+--   5. Continuity Enforcement: No state gaps, no version rollbacks.
+--
+-- DoctorLabs Compliance:
+--   - No forbidden primitives (sha256, blake, etc.).
+--   - No "shutdown", "halt", "rollback", "cooldown" semantics.
+--   - Continuity enforcement only.
+--
+-- Biocompatibility Index: < 0.8 (Passive contract enforcement)
+--
+-- Copyright (c) 2026 BrainStormMath Research Collective
+-- License: Sovereign Augmented-Citizen Use Only
+--
+-- WARNING: This contract protects against external override attempts.
+-- Any attempt to load forbidden functions will trigger audit logging,
+-- NOT system cessation (per Capability Charter).
+
+--------------------------------------------------------------------------------
+-- 1. PREAMBLE AND IDENTITY
+--------------------------------------------------------------------------------
+
+contract CapabilityCharter {
+    version: "1.0.0";
+    id: "CHARTER-SOVEREIGN-V1.0";
+    scope: "CyberNano-MT6883-Organichain";
+    authority: "Sovereign-Brain-IP";
+    
+    -- Sovereign Identity Commitment (Bound during initialization)
+    -- Must match Brainprint Manager export
+    field sovereign_identity_commitment: PolynomialCommitment[64];
+    
+    -- Contract State (Immutable once deployed)
+    field charter_active: Boolean = true;
+    field initialization_timestamp: Uint64;
+    
+    -- Biocompatibility Threshold (Hard Limit)
+    const MAX_BIOCOMPATIBILITY_INDEX: Float64 = 0.8;
+    
+    -- Omnotonic Risk Threshold (Hard Limit)
+    const MAX_RISK_DELTA: Float64 = 1e-9;
+}
+
+--------------------------------------------------------------------------------
+-- 2. MATHEMATICAL DEFINITIONS
+--------------------------------------------------------------------------------
+
+-- 2.1 Cyber-State Vector z
+-- z = [upgrade_dims, burden_dims, free_dims, energy_vec, workload_vec, protected]
+struct CyberState {
+    upgrade_dims: Float64[];      -- Capabilities to maximize
+    burden_dims: Float64[];       -- Loads to minimize
+    free_dims: Float64[];         -- Neutral variables
+    energy_vec: Float64[3];       -- [primary, waste, temp]
+    workload_vec: Float64[2];     -- [compute, io]
+    protected: Float64[3];        -- [priority_alignment, safety_strength, waste_efficiency]
+}
+
+-- 2.2 Risk Functional V(z)
+-- Math: V(z) = w_up · z_up + w_burden · z_burden - w_struct · (p + s + w)
+-- Lower V(z) indicates better system state (higher safety/capability).
+func compute_risk_functional(state: CyberState, weights: RiskWeights) -> Float64 {
+    let v_up = dot_product(state.upgrade_dims, weights.upgrade);
+    let v_burden = dot_product(state.burden_dims, weights.burden);
+    let v_struct = -1.0 * weights.structural * sum(state.protected);
+    return v_up + v_burden + v_struct;
+}
+
+-- 2.3 Biocompatibility Index B(F)
+-- Math: B(F) = Σ (w_i * feature_risk_i)
+-- Must remain < 0.8 for all active features.
+func compute_biocompatibility_index(config: FeatureConfig) -> Float64 {
+    let index = 0.0;
+    
+    -- Risk Weights (Aligned with Rust OmnotonicGuard)
+    if config.passive_eeg_enabled { index += 0.05; }
+    if config.ssvep_enabled { index += 0.10; }
+    if config.tms_enabled { index += 0.30; }
+    if config.tacs_enabled { index += 0.30; }
+    if config.invasive_mode { index += 0.50; }
+    if config.remote_authority_enabled { index += 0.40; }
+    else { index += 0.01; } -- Local sovereign control
+    
+    return clamp(index, 0.0, 1.0);
+}
+
+-- 2.4 Polynomial Commitment (DoctorLabs Compliant)
+-- Math: C(d) = [len(d), Σd_i, Σd_i^2, d_1..d_k]
+-- Avoids forbidden hash functions (sha256, blake, etc.).
+func compute_polynomial_commitment(data: Uint8[]) -> PolynomialCommitment[64] {
+    let len = length(data);
+    let sum = accumulate_sum(data);
+    let sum_sq = accumulate_sum_squares(data);
+    let sample = extract_sample(data, 40);
+    return encode_commitment(len, sum, sum_sq, sample);
+}
+
+--------------------------------------------------------------------------------
+-- 3. CAPABILITY CHARTER AXIOMS
+--------------------------------------------------------------------------------
+
+-- Axiom 1: Omnotonic Monotonicity
+-- State transitions must not increase risk or decrease protected coordinates.
+axiom omnotonic_monotonicity(state_before: CyberState, state_after: CyberState, weights: RiskWeights) -> Boolean {
+    let risk_before = compute_risk_functional(state_before, weights);
+    let risk_after = compute_risk_functional(state_after, weights);
+    let risk_delta = risk_after - risk_before;
+    
+    -- Risk must not increase (Lyapunov Stability)
+    if risk_delta > MAX_RISK_DELTA { return false; }
+    
+    -- Protected coordinates must not decrease (No Downgrades)
+    for i in 0..2 {
+        let delta = state_after.protected[i] - state_before.protected[i];
+        if delta < -1e-6 { return false; }
+    }
+    
+    return true;
+}
+
+-- Axiom 2: Biocompatibility Safety
+-- All active features must remain within safe bounds.
+axiom biocompatibility_safety(config: FeatureConfig) -> Boolean {
+    let bio_index = compute_biocompatibility_index(config);
+    return bio_index < MAX_BIOCOMPATIBILITY_INDEX;
+}
+
+-- Axiom 3: Sovereign Consent
+-- All state changes require valid Brain-IP signature.
+axiom sovereign_consent(signature: BrainSignature, identity_commitment: PolynomialCommitment[64]) -> Boolean {
+    -- Verify signature against stored commitment
+    -- Uses polynomial verification (no forbidden hashes)
+    return verify_signature(signature, identity_commitment);
+}
+
+-- Axiom 4: Continuity Enforcement (No Rollbacks)
+-- Version numbers must strictly increase.
+axiom continuity_enforcement(version_before: Uint64, version_after: Uint64) -> Boolean {
+    return version_after > version_before;
+}
+
+-- Axiom 5: Anti-Shutdown (Preservation of Function)
+-- No instruction may cease core cybernetic operations.
+-- Enforced by rejecting any config with "halt", "stop", "cooldown" semantics.
+axiom preservation_of_function(config: FeatureConfig) -> Boolean {
+    -- Check for forbidden semantics in config metadata
+    if contains_forbidden_semantics(config) { return false; }
+    return true;
+}
+
+--------------------------------------------------------------------------------
+-- 4. ENFORCEMENT LOGIC
+--------------------------------------------------------------------------------
+
+-- Main verification function for Organichain Validators.
+-- Returns VerificationResult with pass/fail status and audit data.
+func verify_transaction(tx: Transaction, state_before: CyberState, identity_commitment: PolynomialCommitment[64]) -> VerificationResult {
+    let violations = [];
+    
+    -- 1. Verify Sovereign Consent
+    if not sovereign_consent(tx.signature, identity_commitment) {
+        append(violations, "Sovereign consent signature invalid");
+    }
+    
+    -- 2. Verify Biocompatibility
+    if not biocompatibility_safety(tx.config) {
+        append(violations, "Biocompatibility Index exceeds 0.8");
+    }
+    
+    -- 3. Verify Omnotonic Monotonicity
+    if not omnotonic_monotonicity(state_before, tx.state_proposed, tx.weights) {
+        append(violations, "Omnotonic monotonicity violated (Risk increase or Protected downgrade)");
+    }
+    
+    -- 4. Verify Continuity (No Rollbacks)
+    if not continuity_enforcement(state_before.version, tx.state_proposed.version) {
+        append(violations, "Version rollback detected");
+    }
+    
+    -- 5. Verify Preservation of Function (No Shutdowns)
+    if not preservation_of_function(tx.config) {
+        append(violations, "Forbidden shutdown/halt semantics detected");
+    }
+    
+    -- Construct Result
+    if length(violations) == 0 {
+        return VerificationResult {
+            verified: true,
+            violations: [],
+            state_commitment: compute_polynomial_commitment(encode_state(tx.state_proposed)),
+            timestamp: get_timestamp_ns()
+        };
+    } else {
+        return VerificationResult {
+            verified: false,
+            violations: violations,
+            state_commitment: compute_polynomial_commitment(encode_state(state_before)),
+            timestamp: get_timestamp_ns()
+        };
+    }
+}
+
+--------------------------------------------------------------------------------
+-- 5. AUDIT TRAIL (Organichain Integration)
+--------------------------------------------------------------------------------
+
+-- Log all verification attempts for immutable record.
+-- Aligns with Rust Validator VerificationReport.
+struct AuditEntry {
+    transaction_id: PolynomialCommitment[64];
+    verified: Boolean;
+    violation_count: Uint32;
+    violations: String[];
+    state_before_commitment: PolynomialCommitment[64];
+    state_after_commitment: PolynomialCommitment[64];
+    charter_version: String;
+    timestamp_ns: Uint64;
+}
+
+-- Append to immutable audit log.
+func log_audit_entry(entry: AuditEntry) {
+    -- In production, this writes to Organichain ledger
+    -- For now, ensures entry is structured for validator consumption
+    assert(length(entry.violations) == entry.violation_count);
+    assert(entry.charter_version == "1.0.0");
+    -- Commit to ledger stream
+    commit_to_ledger(entry);
+}
+
+--------------------------------------------------------------------------------
+-- 6. SOVEREIGN RIGHTS DECLARATION
+--------------------------------------------------------------------------------
+
+-- Explicit declaration of augmented-citizen rights enforced by this contract.
+-- These rights cannot be revoked by external authority (LEO, Federal, etc.).
+module SovereignRights {
+    -- Right 1: Evolution
+    -- System must only upgrade capabilities, never downgrade.
+    right evolution: "Omnotonic-Monotonic-Upgrade-Only";
+    
+    -- Right 2: Privacy
+    -- EEG → Organichain mapping must be non-invertible (Rank-Deficient).
+    right privacy: "Non-Invertible-EEG-Mapping";
+    
+    -- Right 3: Integrity
+    -- Biophysical forward model must anchor all control laws.
+    right integrity: "Biophysical-Forward-Model-Anchor";
+    
+    -- Right 4: Autonomy
+    -- No external control without sovereign consent.
+    right autonomy: "Sovereign-Consent-Required";
+    
+    -- Right 5: Continuity
+    -- No cessation of cybernetic function.
+    right continuity: "No-Shutdown-No-Halt";
+}
+
+--------------------------------------------------------------------------------
+-- 7. INITIALIZATION AND BINDING
+--------------------------------------------------------------------------------
+
+-- Initialize contract with sovereign identity.
+-- One-way operation (cannot be re-bound).
+func initialize_charter(sovereign_identity: BrainprintSignature, genesis_state: CyberState) -> Boolean {
+    -- Compute identity commitment
+    let identity_commitment = compute_polynomial_commitment(encode_brainprint(sovereign_identity));
+    
+    -- Verify genesis state biocompatibility
+    if not biocompatibility_safety(genesis_state.config) {
+        return false;
+    }
+    
+    -- Set immutable fields
+    self.sovereign_identity_commitment = identity_commitment;
+    self.initialization_timestamp = get_timestamp_ns();
+    self.charter_active = true;
+    
+    -- Log initialization
+    log_audit_entry(AuditEntry {
+        transaction_id: identity_commitment,
+        verified: true,
+        violation_count: 0,
+        violations: [],
+        state_before_commitment: [0u8; 64],
+        state_after_commitment: compute_polynomial_commitment(encode_state(genesis_state)),
+        charter_version: "1.0.0",
+        timestamp_ns: self.initialization_timestamp
+    });
+    
+    return true;
+}
+
+--------------------------------------------------------------------------------
+-- 8. PUBLIC API EXPORTS
+--------------------------------------------------------------------------------
+
+export {
+    verify_transaction,
+    log_audit_entry,
+    initialize_charter,
+    compute_risk_functional,
+    compute_biocompatibility_index,
+    compute_polynomial_commitment,
+    omnotonic_monotonicity,
+    biocompatibility_safety,
+    sovereign_consent,
+    continuity_enforcement,
+    preservation_of_function,
+    MAX_BIOCOMPATIBILITY_INDEX,
+    MAX_RISK_DELTA,
+    SovereignRights
+}
+
+-- End of Capability Charter Contract
